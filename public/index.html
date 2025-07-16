@@ -24,7 +24,7 @@
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
-    const socket = io();
+    const socket = io('https://live-chat-app-xisx.onrender.com/');
     let username = "";
     while (!username) {
       username = prompt("Enter your name:");
