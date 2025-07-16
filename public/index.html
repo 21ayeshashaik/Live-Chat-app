@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Group Chat</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="chat-container">
+    <h2>Real-Time Chat</h2>
+    
+    <ul id="messages"></ul>
+    <div id="reply-box" style="display:none; background:#fff3cd; padding:8px; margin-bottom:10px;">
+      <strong>Replying to:</strong> <span id="reply-text"></span>
+      <button id="cancel-reply">Cancel</button>
+    </div>
+    <form id="chat-form">
+      <input id="message-input" autocomplete="off" placeholder="Type your message..." />
+      <button type="submit">Send</button>
+
+    </form>
+    
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    let username = "";
+    while (!username) {
+      username = prompt("Enter your name:");
+    }
+
+    socket.emit("new user", username);
+
+    const form = document.getElementById("chat-form");
+    const input = document.getElementById("message-input");
+    const messages = document.getElementById("messages");
+
+    let replyTo = null;
+
+    const replyBox = document.getElementById("reply-box");
+    const replyText = document.getElementById("reply-text");
+    const cancelReply = document.getElementById("cancel-reply");
+
+    cancelReply.onclick = () => {
+      replyTo = null;
+      replyBox.style.display = "none";
+    };
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      if (input.value.trim()) {
+        const messageData = {
+          name: username,
+          message: input.value.trim(),
+          replyTo: replyTo,
+        };
+        socket.emit("chat message", messageData);
+        input.value = "";
+        replyTo = null;
+        replyBox.style.display = "none";
+      }
+    });
+
+    socket.on("chat message", (data) => {
+      const li = document.createElement("li");
+      li.className = data.name === username ? "message right" : "message left";
+      li.id = `msg-${data.id}`;
+
+      const bubble = document.createElement("div");
+      bubble.className = "bubble";
+
+      // Optional reply preview
+      if (data.replyTo) {
+        const reply = document.createElement("div");
+        reply.className = "reply";
+        reply.textContent = `Replying to: ${data.replyTo.message}`;
+        bubble.appendChild(reply);
+      }
+
+    const msgText = document.createElement("div");
+msgText.className = "msg-content";
+msgText.textContent = data.message;
+bubble.appendChild(msgText);
+
+
+      if (data.name !== username) {
+        const nameLabel = document.createElement("div");
+        nameLabel.className = "username";
+        nameLabel.textContent = data.name;
+        li.appendChild(nameLabel);
+      }
+
+      // More (⋮) button
+      const moreBtn = document.createElement("button");
+      moreBtn.className = "more-btn";
+      moreBtn.textContent = "↩";
+      bubble.appendChild(moreBtn);
+
+      // Hidden actions menu
+      const actions = document.createElement("div");
+      actions.className = "actions";
+
+      const replyBtn = document.createElement("button");
+      replyBtn.textContent = "Reply";
+      replyBtn.onclick = () => {
+        replyTo = data;
+        replyText.textContent = data.message;
+        replyBox.style.display = "block";
+        actions.style.display = "none";
+      };
+      actions.appendChild(replyBtn);
+
+      if (data.name === username) {
+        const deleteBtn = document.createElement("button");
+        deleteBtn.textContent = "Delete";
+        deleteBtn.onclick = () => {
+          actions.style.display = "none";
+          if (confirm("Are you sure you want to delete this message?")) {
+            socket.emit("delete message", data.id);
+          }
+        };
+        actions.appendChild(deleteBtn);
+      }
+
+      bubble.appendChild(actions);
+
+      // Toggle visibility of actions
+      moreBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        actions.style.display = actions.style.display === "block" ? "none" : "block";
+      });
+
+      // Click outside to hide actions
+      document.addEventListener("click", () => {
+        actions.style.display = "none";
+      });
+
+      li.appendChild(bubble);
+      messages.appendChild(li);
+      messages.scrollTop = messages.scrollHeight;
+    });
+
+    socket.on("delete message", (msgId) => {
+      const el = document.getElementById(`msg-${msgId}`);
+      if (el) el.remove();
+    });
+
+    socket.on("user joined", (name) => {
+      const li = document.createElement("li");
+      li.className = "status";
+      li.textContent = `${name} joined the chat`;
+      messages.appendChild(li);
+    });
+
+    socket.on("user left", (name) => {
+      const li = document.createElement("li");
+      li.className = "status";
+      li.textContent = `${name} left the chat`;
+      messages.appendChild(li);
+    });
+  </script>
+</body>
+</html>
